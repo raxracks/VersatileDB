@@ -25,6 +25,24 @@ class DB {
             writeFileSync(this.path, deflated);
         }
 
+        this.search = function(word) {
+            let results = [];
+
+            let expr = new RegExp(`(${word})\\w+`, 'gi');
+            let match = this.data.match(expr);
+            if(match !== null) results.push(...this.data.match(expr))
+
+            expr = new RegExp(`\\w+(${word})`, 'gi');
+            match = this.data.match(expr);
+            if(match !== null) results.push(...this.data.match(expr))
+
+            expr = new RegExp(`\\w+(${word})\\w+`, 'gi');
+            match = this.data.match(expr);
+            if(match !== null) results.push(...this.data.match(expr))
+
+            return results;
+        }
+
         this.queue_set = function(key, value) {
             this.queue.push([key, value]);
         }
