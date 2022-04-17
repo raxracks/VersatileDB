@@ -1,0 +1,32 @@
+{
+  "entities": {
+    "user": {
+      "id": {
+        "type": "number"
+      },
+      "name": {
+        "type": "string",
+        "value": "No name"
+      }
+    },
+    "package": {
+      "name": {
+        "type": "string"
+      },
+      "user": {
+        "type": "string"
+      },
+      "repo": {
+        "type": "string"
+      },
+      "versions": {
+        "type": "object",
+        "value": []
+      },
+      "files": {
+        "type": "object",
+        "value": []
+      }
+    }
+  }
+}
