@@ -1,8 +1,7 @@
-const { gunzipSync, gzipSync } = require("zlib");
-const { readFileSync, writeFileSync } = require("fs");
-const { inherits } = require("util");
+import { gunzipSync, gzipSync } from "zlib";
+import { readFileSync, writeFileSync } from "fs";
 
-class DB {
+export class DB {
   constructor(path, options = {}) {
     this.path = path;
     this.queue = [];
@@ -13,10 +12,15 @@ class DB {
         readFileSync(options.schema, { flag: "r", encoding: "utf-8" })
       );
 
-    this.validate = options?.validate ? options.validate : false;
+    this.validate = options?.validate ? options.validate : true;
+    this.autoinsert = options?.autoinsert ? options.autoinsert : true;
 
     this.remove = function (key) {
-      const item = `${key}:${this.get(key)}\0`;
+      let item = `${key}:${this.get(key)}\0`;
+
+      if (typeof this.get(key) === "object")
+        item = `${key}:${JSON.stringify(this.get(key))}\0`;
+
       this.data = this.data.replace(item, "");
     };
 
@@ -24,19 +28,13 @@ class DB {
       this.queue.push([key, value]);
     };
 
-    this.queue_commit = function () {
+    this.queue_push = function () {
       for (let i = 0; i < this.queue.length; i++) {
         const arr = this.queue[i];
         const key = arr[0];
         const value = arr[1];
-        const item = `${key}:${value}\0`;
 
-        if (!this.data.includes(`${key}:`)) {
-          this.data += item;
-        } else {
-          const value = this.data.split(`${key}:`)[1].split("\0")[0];
-          this.data = this.data.split(`${key}:${value}`).join(item);
-        }
+        this.set(key, value);
       }
 
       this.queue = [];
@@ -50,12 +48,13 @@ class DB {
 
       Object.keys(values).forEach((item) => {
         if (!s_entity[item])
-          throw new SchemaError(
-            `"${item}" is not in the entity "${entity}".`
-          );
+          throw new SchemaError(`"${item}" is not in the entity "${entity}".`);
       });
 
       Object.keys(s_entity).forEach((item) => {
+        if (item === "primary") return;
+        if (item === s_entity["primary"]) return;
+
         if (values[item]) {
           if (this.validate && typeof values[item] !== s_entity[item].type)
             throw new SchemaError(
@@ -65,7 +64,6 @@ class DB {
                 s_entity[item].type
               }".`
             );
-
           obj[item] = values[item];
         } else {
           if (!s_entity[item]["value"])
@@ -77,10 +75,13 @@ class DB {
         }
       });
 
-      return obj;
+      if (this.autoinsert) this.set(values[s_entity["primary"]], obj);
+
+      return [values[s_entity["primary"]], obj];
     };
 
     this.set = function (key, value) {
+      if (typeof value == "object") value = JSON.stringify(value);
       const item = `${key}:${value}\0`;
 
       if (!this.data.includes(`${key}:`)) {
@@ -107,11 +108,15 @@ class DB {
 
     this.get = function (key) {
       if (!this.data.includes(`${key}:`)) return undefined;
-      return this.data.split(`${key}:`)[1].split("\0")[0];
+
+      let d = this.data.split(`${key}:`)[1].split("\0")[0];
+      if (typeof JSON.parse(d) == "object") d = JSON.parse(d);
+      return d;
     };
 
     this.read = function () {
       this.data = gunzipSync(readFileSync(this.path, { flag: "r" })).toString();
+      return this;
     };
 
     this.format = function () {
@@ -123,10 +128,39 @@ class DB {
     this.commit = function () {
       writeFileSync(this.path, gzipSync(this.data));
     };
+
+    this.create_and_commit = function (entity, values) {
+      this.autoinsert = true;
+      this.create(entity, values);
+      this.commit();
+    };
+
+    this.set_and_commit = function (key, value) {
+      this.set(key, value);
+      this.commit();
+    };
+
+    this.read_and_get = function (key) {
+      this.read();
+      return this.get(key);
+    };
+
+    this.read_and_jsonify = function () {
+      this.read();
+      return this.jsonify();
+    };
+
+    this.remove_and_commit = function (key) {
+      this.remove(key);
+      this.commit();
+    };
+
+    this.queue_push_and_commit = function () {
+      this.queue_push();
+      this.commit();
+    };
   }
 }
-
-module.exports.DB = DB;
 
 class SchemaError extends Error {
   constructor(message) {

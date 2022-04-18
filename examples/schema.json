@@ -1,15 +1,8 @@
 {
   "entities": {
-    "user": {
-      "id": {
-        "type": "number"
-      },
-      "name": {
-        "type": "string",
-        "value": "No name"
-      }
-    },
     "package": {
+      "primary": "name",
+
       "name": {
         "type": "string"
       },
