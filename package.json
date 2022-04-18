@@ -17,5 +17,8 @@
   "bugs": {
     "url": "https://github.com/raxracks/versatiledb/issues"
   },
-  "homepage": "https://github.com/raxracks/versatiledb#readme"
+  "homepage": "https://github.com/raxracks/versatiledb#readme",
+  "devDependencies": {
+    "@types/node": "^17.0.24"
+  }
 }

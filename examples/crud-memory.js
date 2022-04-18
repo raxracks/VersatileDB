@@ -1,6 +1,6 @@
 // Everything done here will happen in memory and will not be committed to the file until commit() is called
 
-import { DB } from "../versatiledb.js";
+import { DB } from "../VersatileDB.js";
 
 const database = new DB("example.db", {
   schema: "schema.json",

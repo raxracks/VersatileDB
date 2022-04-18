@@ -1,6 +1,6 @@
 // Everything done here will instantly commit to the file
 
-import { DB } from "../versatiledb.js";
+import { DB } from "../VersatileDB.js";
 
 const database = new DB("example.db", {
   schema: "schema.json",
