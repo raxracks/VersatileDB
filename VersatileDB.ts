@@ -1,6 +1,5 @@
 import { gunzipSync, gzipSync } from "zlib";
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { join } from "path";
 
 export class DB {
   schema: any;
@@ -27,6 +26,9 @@ export class DB {
   INTERNAL_STRINGIFY: (value: any) => string;
   INTERNAL_PARSE: (value: string) => any;
   INTERNAL_RANDOM: () => string;
+  INTERNAL_FIND: (value: string) => object;
+  removeOne: (filter: any) => Promise<unknown>;
+  INTERNAL_SET: (value: any) => any;
 
   constructor(path: string, options: any = {}) {
     this.path = path;
@@ -43,19 +45,73 @@ export class DB {
     this.validate = options.validate ? options.validate : true;
     this.autoinsert = options.autoinsert ? options.autoinsert : true;
 
-    this.remove = function (key) {
-      return this;
-    };
-
     this.INTERNAL_RANDOM = function () {
       return new Array(20)
         .fill("")
         .map((_, idx) =>
           idx % Math.floor(Math.random() * 5) == 0
-            ? String.fromCharCode(65 + Math.floor(Math.random() * 52))
+            ? String.fromCharCode(97 + Math.floor(Math.random() * 26))
             : Math.floor(Math.random() * 9)
         )
         .join("");
+    };
+
+    this.INTERNAL_STRINGIFY = function (value: { [key: string]: any }) {
+      return Object.keys(value)
+        .map((key: string) => `${key}${this.itemValueDelimiter}${value[key]}`)
+        .join(this.itemDelimiter);
+    };
+
+    this.INTERNAL_PARSE = async function (value: string | undefined) {
+      if (!value) return undefined;
+      let stringObj = `{"${value
+        .split("{:}")
+        .join(`":"`)
+        .split("{|}")
+        .join(`","`)}"}`;
+
+      if (stringObj.includes("ref:")) {
+        let ref = stringObj.split("ref:")[1];
+        let path = ref.split(">")[0];
+        let key = ref.split(">")[1];
+        let value = ref.split(">")[2].split('"')[0];
+
+        const refDB = new DB(path).read();
+
+        const filter: any = {};
+        filter[key] = value;
+
+        stringObj = stringObj
+          .split(`"ref:${path}>${key}>${value}"`)
+          .join(JSON.stringify(await refDB.findOne(filter)));
+      }
+
+      const obj = JSON.parse(stringObj);
+
+      return obj;
+    };
+
+    this.INTERNAL_FIND = function (value: string) {
+      const regex = new RegExp(`.*(${value}).*`, "gi");
+      const match = this.data.match(regex);
+
+      return match;
+    };
+
+    this.INTERNAL_SET = function (value) {
+      const newValue = this.INTERNAL_STRINGIFY(value);
+      this.data += `${newValue}\n`;
+
+      return this;
+    };
+
+    this.removeOne = function (filter) {
+      return new Promise(async (res, rej) => {
+        const row = await this.INTERNAL_FIND(filter)[0];
+        this.data = this.data.split(row).join("");
+
+        res(true);
+      });
     };
 
     this.find = async function (filter: { [key: string]: any }) {
@@ -80,8 +136,7 @@ export class DB {
               filter[key][Object.keys(filter[key])[0]]
             }`;
 
-          const regex = new RegExp(`.*(${value}).*`, "gi");
-          const match = this.data.match(regex);
+          const match = this.INTERNAL_FIND(value);
 
           if (match) {
             for (const m of match) {
@@ -98,12 +153,13 @@ export class DB {
       return new Promise(async (res, rej) => {
         Object.keys(filter).forEach(async (key: string) => {
           const value = `${key}${this.itemValueDelimiter}${filter[key]}`;
-          const regex = new RegExp(`.*(${value}).*`, "i");
 
-          const match = this.data.match(regex);
+          const match = this.INTERNAL_FIND(value);
 
           if (match) {
             res(await this.INTERNAL_PARSE(match[0]));
+          } else {
+            res(undefined);
           }
         });
       });
@@ -164,7 +220,7 @@ export class DB {
           obj[s_entity["key"]] = this.INTERNAL_RANDOM();
         } while (this.data.includes(obj[s_entity["key"]]));
 
-        if (this.autoinsert) this.set(obj);
+        if (this.autoinsert) this.INTERNAL_SET(obj);
 
         res(obj);
       });
@@ -185,48 +241,6 @@ export class DB {
       this.data = this.data
         .split(this.INTERNAL_STRINGIFY(previous))
         .join(this.INTERNAL_STRINGIFY(updated));
-    };
-
-    this.INTERNAL_STRINGIFY = function (value: { [key: string]: any }) {
-      return Object.keys(value)
-        .map((key: string) => `${key}${this.itemValueDelimiter}${value[key]}`)
-        .join(this.itemDelimiter);
-    };
-
-    this.INTERNAL_PARSE = async function (value: string | undefined) {
-      if (!value) return undefined;
-      let stringObj = `{"${value
-        .split("{:}")
-        .join(`":"`)
-        .split("{|}")
-        .join(`","`)}"}`;
-
-      if (stringObj.includes("ref:")) {
-        let ref = stringObj.split("ref:")[1];
-        let path = ref.split(">")[0];
-        let key = ref.split(">")[1];
-        let value = ref.split(">")[2].split('"')[0];
-
-        const refDB = new DB(path).read();
-
-        const filter: any = {};
-        filter[key] = value;
-
-        stringObj = stringObj
-          .split(`"ref:${path}>${key}>${value}"`)
-          .join(JSON.stringify(await refDB.findOne(filter)));
-      }
-
-      const obj = JSON.parse(stringObj);
-
-      return obj;
-    };
-
-    this.set = function (value) {
-      const newValue = this.INTERNAL_STRINGIFY(value);
-      this.data += `${newValue}\n`;
-
-      return this;
     };
 
     this.read = function () {

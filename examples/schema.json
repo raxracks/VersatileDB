@@ -1,24 +1,27 @@
 {
   "entities": {
     "package": {
-      "primary": "name",
+      "key": "id",
+
+      "id": {
+        "type": "string"
+      },
 
       "name": {
         "type": "string"
       },
+
       "user": {
         "type": "string"
       },
+
       "repo": {
         "type": "string"
       },
-      "versions": {
-        "type": "object",
-        "value": []
-      },
-      "files": {
-        "type": "object",
-        "value": []
+
+      "PI": {
+        "type": "number",
+        "value": 3.1415926
       }
     }
   }

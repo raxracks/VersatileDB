@@ -89,6 +89,11 @@ In the case that the database file does not exist `format()` will be called to c
 - Returns: The matching row in the database.
 - Description: Finds a row in the current database, uses Regex and can find partial matches.
 
+`updateOne(filter: object, newDataFilter: object)`:
+
+- Returns: `this`.
+- The first filter is used to find the row, the second is used to specify which values are updated and what the new values are.
+
 <!-- `remove(key: string)`:
 
 - No return value.
@@ -101,3 +106,8 @@ In the case that the database file does not exist `format()` will be called to c
 - Omits the `key` defined in the schema from the value, will be used as the unique ID.
 - Validates types according to the schema if the `validate` flag is true.
 - Will use default value of the entity item if no value for said item is given in the values object.
+
+`ref(filter: object): string`:
+
+- Returns: The row represented as a reference data string.
+- Can be used for referencing data in other databases.
