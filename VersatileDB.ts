@@ -1,5 +1,5 @@
-import { gunzipSync, gzipSync } from 'zlib';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { gunzipSync, gzipSync } from "zlib";
+import { readFileSync, writeFileSync, existsSync } from "fs";
 
 export class DB {
   schema: any;
@@ -29,17 +29,18 @@ export class DB {
   INTERNAL_FIND: (value: string) => object;
   removeOne: (filter: any) => Promise<unknown>;
   INTERNAL_SET: (value: any) => any;
+  INTERNAL_ESCAPE: (value: any) => any;
 
   constructor(path: string, options: any = {}) {
     this.path = path;
     this.queue = [];
-    this.data = '';
-    this.itemValueDelimiter = '{:}';
-    this.itemDelimiter = '{|}';
+    this.data = "";
+    this.itemValueDelimiter = "{:}";
+    this.itemDelimiter = "{|}";
 
     if (options.schema)
       this.schema = JSON.parse(
-        readFileSync(options.schema, { flag: 'r', encoding: 'utf-8' }),
+        readFileSync(options.schema, { flag: "r", encoding: "utf-8" })
       );
 
     this.validate = options.validate ? options.validate : true;
@@ -47,13 +48,13 @@ export class DB {
 
     this.INTERNAL_RANDOM = function () {
       return new Array(20)
-        .fill('')
+        .fill("")
         .map((_, idx) =>
           idx % Math.floor(Math.random() * 5) == 0
             ? String.fromCharCode(97 + Math.floor(Math.random() * 26))
-            : Math.floor(Math.random() * 9),
+            : Math.floor(Math.random() * 9)
         )
-        .join('');
+        .join("");
     };
 
     this.INTERNAL_STRINGIFY = function (value: { [key: string]: any }) {
@@ -65,16 +66,16 @@ export class DB {
     this.INTERNAL_PARSE = async function (value: string | undefined) {
       if (!value) return undefined;
       let stringObj = `{"${value
-        .split('{:}')
+        .split("{:}")
         .join(`":"`)
-        .split('{|}')
+        .split("{|}")
         .join(`","`)}"}`;
 
-      if (stringObj.includes('ref:')) {
-        let ref = stringObj.split('ref:')[1];
-        let path = ref.split('>')[0];
-        let key = ref.split('>')[1];
-        let value = ref.split('>')[2].split('"')[0];
+      if (stringObj.includes("ref:")) {
+        let ref = stringObj.split("ref:")[1];
+        let path = ref.split(">")[0];
+        let key = ref.split(">")[1];
+        let value = ref.split(">")[2].split('"')[0];
 
         const refDB = new DB(path).read();
 
@@ -93,8 +94,8 @@ export class DB {
 
     this.INTERNAL_FIND = function (value: string) {
       const regex = new RegExp(
-        `.*(${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}).*`,
-        'gi',
+        `.*(${value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}).*`,
+        "gi"
       );
       const match = this.data.match(regex);
 
@@ -108,10 +109,29 @@ export class DB {
       return this;
     };
 
+    this.INTERNAL_ESCAPE = function (value) {
+      return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    };
+
     this.removeOne = function (filter) {
       return new Promise(async (res, rej) => {
-        const row = await this.INTERNAL_FIND(filter)[0];
-        this.data = this.data.split(row).join('');
+        for (const key of Object.keys(filter)) {
+          let value = `${key}${this.itemValueDelimiter}${filter[key]}`;
+
+          if (typeof filter[key] === "object") {
+            value = `(.*?)${this.INTERNAL_ESCAPE(
+              Object.keys(filter[key])[0]
+            )}>${this.INTERNAL_ESCAPE(
+              filter[key][Object.keys(filter[key])[0]]
+            )}`;
+          }
+
+          const match = this.INTERNAL_FIND(value);
+
+          if (match) {
+            this.data = this.data.replace(match[0], "");
+          }
+        }
 
         res(true);
       });
@@ -126,7 +146,7 @@ export class DB {
         const keys = Object.keys(filter);
 
         if (keys.length === 0) {
-          for (const line of this.data.split('\n')) {
+          for (const line of this.data.split("\n")) {
             if (!!line.trim()) results.push(await this.INTERNAL_PARSE(line));
           }
         }
@@ -134,10 +154,13 @@ export class DB {
         for (const key of keys) {
           let value = `${key}${this.itemValueDelimiter}${filter[key]}`;
 
-          if (typeof filter[key] === 'object')
-            value = `(.*?)${Object.keys(filter[key])[0]}>${
+          if (typeof filter[key] === "object") {
+            value = `(.*?)${this.INTERNAL_ESCAPE(
+              Object.keys(filter[key])[0]
+            )}>${this.INTERNAL_ESCAPE(
               filter[key][Object.keys(filter[key])[0]]
-            }`;
+            )}`;
+          }
 
           const match = this.INTERNAL_FIND(value);
 
@@ -155,7 +178,9 @@ export class DB {
     this.findOne = async function (filter: { [key: string]: any }) {
       return new Promise(async (res, rej) => {
         Object.keys(filter).forEach(async (key: string) => {
-          const value = `${key}${this.itemValueDelimiter}${filter[key]}`;
+          const value = this.INTERNAL_ESCAPE(
+            `${key}${this.itemValueDelimiter}${filter[key]}`
+          );
 
           const match = this.INTERNAL_FIND(value);
 
@@ -173,7 +198,7 @@ export class DB {
         res(
           `ref:${this.path}>${Object.keys(filter)[0]}>${
             filter[Object.keys(filter)[0]]
-          }`,
+          }`
         );
       });
     };
@@ -188,17 +213,17 @@ export class DB {
         Object.keys(values).forEach((item) => {
           if (!s_entity[item])
             throw new SchemaError(
-              `"${item}" is not in the entity "${entity}".`,
+              `"${item}" is not in the entity "${entity}".`
             );
         });
 
         Object.keys(s_entity).forEach((item) => {
-          if (item === 'key' || item === s_entity['key']) return;
+          if (item === "key" || item === s_entity["key"]) return;
 
           if (values[item]) {
             if (
               this.validate &&
-              s_entity[item].type !== 'ref' &&
+              s_entity[item].type !== "ref" &&
               typeof values[item] !== s_entity[item].type
             )
               throw new SchemaError(
@@ -206,22 +231,22 @@ export class DB {
                   item
                 ]}) does not match schema, expected type "${
                   s_entity[item].type
-                }".`,
+                }".`
               );
             obj[item] = values[item];
           } else {
-            if (!s_entity[item]['value'])
+            if (!s_entity[item]["value"])
               throw new SchemaError(
-                `"${item}" was not specified a value and has no default value.`,
+                `"${item}" was not specified a value and has no default value.`
               );
 
-            obj[item] = s_entity[item]['value'];
+            obj[item] = s_entity[item]["value"];
           }
         });
 
         do {
-          obj[s_entity['key']] = this.INTERNAL_RANDOM();
-        } while (this.data.includes(obj[s_entity['key']]));
+          obj[s_entity["key"]] = this.INTERNAL_RANDOM();
+        } while (this.data.includes(obj[s_entity["key"]]));
 
         if (this.autoinsert) this.INTERNAL_SET(obj);
 
@@ -249,12 +274,12 @@ export class DB {
     this.read = function () {
       if (!existsSync(this.path)) this.format();
 
-      this.data = gunzipSync(readFileSync(this.path, { flag: 'r' })).toString();
+      this.data = gunzipSync(readFileSync(this.path, { flag: "r" })).toString();
       return this;
     };
 
     this.format = function () {
-      const deflated = gzipSync('');
+      const deflated = gzipSync("");
 
       writeFileSync(this.path, deflated);
 
@@ -271,6 +296,6 @@ export class DB {
 class SchemaError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'SchemaError';
+    this.name = "SchemaError";
   }
 }

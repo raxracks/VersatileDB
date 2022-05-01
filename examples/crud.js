@@ -6,7 +6,9 @@ import { DB } from "../VersatileDB.js";
     schema: "schema.json",
     validate: true,
     autoinsert: true,
-  }).read();
+  })
+    .format()
+    .read();
 
   // Create
   console.log(
